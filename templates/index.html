@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>总图谱</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+</head>
+<body>
+<div class="navbar">
+    <a style="width:400px"><img src="{{url_for('static',filename='hostgator.png')}}" alt="a">龙智医疗</a>
+    <a href="{{url_for('html',filename='home.html')}}">首页</a>
+    <div class="dropdown">
+        <a href="{{url_for('html',filename='index.html')}}">知识图谱</a>
+        <div class="dropdown-content">
+            <a href="{{url_for('html',filename='index.html')}}">总图谱</a>
+            <a href="{{url_for('html',filename='type1.html')}}">共现关系</a>
+            <a href="{{url_for('html',filename='type2.html')}}">关联关系</a>
+            <a href="{{url_for('html',filename='type3.html')}}">风险评估关系</a>
+            <a href="{{url_for('html',filename='type4.html')}}">诊断关系</a>
+            <a href="{{url_for('html',filename='type5.html')}}">建议适用关系</a>
+            <a href="{{url_for('html',filename='search.html')}}">根据名称查询</a>
+        </div>
+    </div>
+    <a href="https://mbd.baidu.com/ma/s/gA2rpZEA">AI问诊</a>
+</div>
+
+<main id="mynetwork">
+    <div id="network"></div>
+</main>
+
+<script>
+    window.addEventListener('load', async () => {
+        try {
+            // 请求五种关系的数据
+            const requests = [
+                fetch('http://localhost:3000/api/type1'),
+                fetch('http://localhost:3000/api/type2'),
+                fetch('http://localhost:3000/api/type3'),
+                fetch('http://localhost:3000/api/type4'),
+                fetch('http://localhost:3000/api/type5')
+            ];
+
+            const totalRequests = requests.length;
+            let loadedRequests = 0; // 已加载的请求数量
+
+            const responses = await Promise.all(requests.map((request, index) => {
+                return request
+                    .then(response => {
+                        loadedRequests++;
+                        const progress = Math.floor((loadedRequests / totalRequests) * 100);
+                        console.log(`加载进度: ${progress}%`);
+                        return response;
+                    })
+                    .catch(error => {
+                        console.error(`请求 ${index + 1} 失败:`, error);
+                        return null; // 返回 null 以继续处理其余的请求
+                    });
+            }));
+
+            const dataPromises = responses.filter(response => response !== null).map(response => response.json());
+            const dataArray = await Promise.all(dataPromises);
+            console.log('Fetched data:', dataArray);  // 打印获取到的数据
+
+            // 合并所有关系的数据
+            const allNodes = [];
+            const allEdges = [];
+
+            dataArray.forEach(data => {
+                allNodes.push(...data.nodes);
+                allEdges.push(...data.edges);
+            });
+
+            // 渲染图谱
+            renderGraph({ nodes: allNodes, edges: allEdges });
+        } catch (error) {
+            console.error('Fetch error:', error);
+        }
+    });
+
+    function renderGraph(data) {
+        // 去重节点，确保同一名称的节点只有一个
+        const uniqueNodes = {};
+
+        // 计算每个节点的度数（每个节点连接的边的数量）
+        const nodeDegrees = {};
+
+        data.edges.forEach(edge => {
+            nodeDegrees[edge.startId] = (nodeDegrees[edge.startId] || 0) + 1;
+            nodeDegrees[edge.endId] = (nodeDegrees[edge.endId] || 0) + 1;
+        });
+
+        // 获取度数最高的前八个节点
+        const sortedNodeIds = Object.keys(nodeDegrees).sort((a, b) => nodeDegrees[b] - nodeDegrees[a]);
+        const centerNodeIds = sortedNodeIds.slice(0, 6);  // 获取前六个节点
+
+        data.nodes.forEach(node => {
+            if (!uniqueNodes[node.name]) {
+                uniqueNodes[node.name] = node;
+            }
+        });
+
+        const nodes = Object.values(uniqueNodes).map(node => {
+            const isCenter = centerNodeIds.includes(node.id.toString());
+            return {
+                id: node.id,
+                name: node.name,
+                symbolSize: isCenter ? 40 : 20,
+                itemStyle: {
+                    color: isCenter ? 'orange' : 'skyblue',
+                    borderColor: isCenter ? 'darkorange' : 'blue',
+                    borderWidth: isCenter ? 3 : 1
+                },
+                label: {
+                    show: true,
+                    fontSize: 14,
+                    color: 'black'
+                }
+            };
+        });
+
+        const edgesSet = new Set();
+        const edges = data.edges.filter(edge => {
+            const edgeKey = edge.startId < edge.endId
+                ? `${edge.startId}-${edge.endId}`
+                : `${edge.endId}-${edge.startId}`;
+
+            if (edgesSet.has(edgeKey)) {
+                return false;
+            }
+            edgesSet.add(edgeKey);
+            return true;
+        }).map(edge => ({
+            source: edge.startId,
+            target: edge.endId
+        }));
+
+        const chartData = {
+            nodes: nodes,
+            links: edges
+        };
+
+        const container = document.getElementById('network');
+        const myChart = echarts.init(container);
+
+        const option = {
+            title: {
+                text: '总图谱',
+                left: 'center'
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}'
+            },
+            series: [{
+                type: 'graph',
+                layout: 'force',  // 使用力导向布局
+                symbolSize: 30,
+                roam: true,
+                label: {
+                    show: true,
+                    fontSize: 14,
+                    color: '#000'
+                },
+                edgeSymbol: ['none', 'none'],
+                edgeLabel: {
+                    fontSize: 12
+                },
+                data: chartData.nodes,
+                links: chartData.links,
+                force: {
+                    repulsion: 150,
+                    edgeLength: [50, 150]
+                },
+                emphasis: {
+                    focus: 'adjacency',
+                    itemStyle: {
+                        color: 'red'
+                    }
+                }
+            }]
+        };
+
+        myChart.setOption(option);
+
+        // 点击事件处理
+        myChart.on('click', function (params) {
+            if (params.dataType === 'node') {
+                const nodeId = params.data.id;
+                const nodeName = params.data.name;
+                // 假设跳转到 detail.html 页面，并传递节点的 ID 和名称作为查询参数
+                window.location.href = `detail.html?nodeId=${nodeId}&nodeName=${encodeURIComponent(nodeName)}`;
+            }
+        });
+    }
+</script>
+
+<footer style="background-color:grey;">
+    <p>龙队 ©版权所有</p>
+</footer>
+</body>
+</html>

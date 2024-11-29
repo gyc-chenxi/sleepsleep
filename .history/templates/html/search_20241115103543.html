@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>疾病知识图谱</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+<header>
+    <h1>疾病知识图谱</h1>
+    <nav>
+        <ul>
+            <li><a href="index.html">总图谱</a></li>
+            <li><a href="type1.html">共现关系</a></li>
+            <li><a href="type2.html">关联关系</a></li>
+            <li><a href="type3.html">风险评估关系</a></li>
+            <li><a href="type4.html">诊断关系</a></li>
+            <li><a href="type5.html">建议适用关系</a></li>
+            <li><a href="search.html">根据名称查询</a></li>
+        </ul>
+    </nav>
+</header>
+
+<!-- 输入框和按钮 -->
+<div class="input-container">
+    <!-- 使用Flask传递的预测疾病结果 -->
+    <input type="text" id="diseaseInput" placeholder="请输入疾病名称" value="{{ predicted_disease }}" readonly />
+    <button onclick="loadGraph()">加载知识图谱</button>
+</div>
+
+<!-- 图谱显示区域 -->
+<div id="network"></div>
+
+<script>
+    let network = null;
+    let nodesDataSet = new vis.DataSet();
+    let edgesDataSet = new vis.DataSet();
+
+    async function loadGraph() {
+        const diseaseName = document.getElementById('diseaseInput').value.trim();
+
+        if (!diseaseName) {
+            alert("请输入一个疾病名称！");
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/data?disease=${encodeURIComponent(diseaseName)}`);
+
+            if (!response.ok) {
+                console.error('Network response was not ok:', response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+
+            // 检查返回的数据结构
+            if (!data.nodes || !data.edges) {
+                console.error('Data structure is invalid:', data);
+                return;
+            }
+
+            // 清空现有图谱的节点和边
+            nodesDataSet.clear();
+            edgesDataSet.clear();
+
+            let diseaseNodeId = 1; // 使用一个固定的 ID 来标识疾病节点
+
+            // 添加疾病节点
+            nodesDataSet.add({
+                id: diseaseNodeId,
+                label: diseaseName,
+                color: 'red',
+                size: 30,
+                x: 0,   // 固定中心节点位置
+                y: 0    // 固定中心节点位置
+            });
+
+            // 其他相关节点
+            data.nodes.forEach((node, index) => {
+                nodesDataSet.add({
+                    id: node.id,
+                    label: node.name,
+                    color: 'lightblue',
+                    size: 20,
+                    x: Math.cos(index * 2 * Math.PI / data.nodes.length) * 150,
+                    y: Math.sin(index * 2 * Math.PI / data.nodes.length) * 150
+                });
+            });
+
+            // 添加边
+            data.edges.forEach(edge => {
+                edgesDataSet.add({
+                    from: diseaseNodeId,
+                    to: edge.to,
+                    label: '相关',
+                    arrows: 'to'
+                });
+            });
+
+            // 初始化网络图
+            const container = document.getElementById('network');
+            const dataSet = { nodes: nodesDataSet, edges: edgesDataSet };
+            const options = {
+                physics: { enabled: false },
+                nodes: { shape: 'dot', size: 10 },
+                edges: { width: 2, color: { color: '#848484' } },
+                layout: { randomSeed: 2, hierarchical: false },
+                interaction: { hover: true, tooltipDelay: 200 }
+            };
+
+            if (network) {
+                network.setData(dataSet);
+            } else {
+                network = new vis.Network(container, dataSet, options);
+            }
+
+        } catch (error) {
+            console.error('Error loading graph data:', error);
+        }
+    }
+
+    window.onload = function() {
+        loadGraph();
+    }
+</script>
+
+</body>
+</html>

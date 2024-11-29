@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>总图谱</title>
+    <script src="{{ url_for('static', filename='echarts.min.js') }}"></script>
+    <style>
+        .navbar {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.9); /* 导航栏半透明背景 */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            padding: 1rem;
+        }
+        .navbar a {
+            color: #333;
+            text-decoration: none;
+            font-weight: 700;
+            transition: color 0.3s ease;
+        }
+        .navbar a:hover {
+            color: #007bff;
+        }
+        .navbar img{
+            width:50px;
+            height:40px;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            color: #333;
+            overflow: hidden;
+        }
+
+        /* Header 样式 */
+        header {
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            color: #fff;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Header 标题 */
+        header h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: color 0.3s ease;
+        }
+
+        /* 导航栏 */
+        nav {
+            margin-top: 1rem;
+            display: none;
+            text-align: center;
+            background-color: #2c3e50;
+            transition: all 0.3s ease;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            z-index: 9;
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        nav ul li {
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        nav ul li a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: 500;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+
+        nav ul li a:hover {
+            background-color: #3498db;
+            transform: scale(1.1);
+        }
+
+        /* 鼠标悬停在header区域时显示导航栏 */
+        header:hover + nav {
+            display: block;
+        }
+
+        /* 网络图容器 */
+        #network {
+            width: 100vw;
+            height: calc(100vh - 150px); /* 减去 header 和导航栏的高度 */
+            background-color: #fafafa;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
+        }
+
+        /* 主要内容区域 */
+        main {
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            nav ul li {
+                display: block;
+                margin-bottom: 10px;
+            }
+
+            main {
+                padding: 20px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <h1>总图谱</h1>
+        <nav>
+            <ul>
+                <li><a href="index.html">总图谱</a></li>
+                <li><a href="type1.html">共现关系</a></li>
+                <li><a href="type2.html">关联关系</a></li>
+                <li><a href="type3.html">风险评估关系</a></li>
+                <li><a href="type4.html">诊断关系</a></li>
+                <li><a href="type5.html">建议适用关系</a></li>
+                <li><a href="search.html">根据名称查询</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="mynetwork">
+        <div id="network"></div>
+    </main>
+
+    <script>
+        window.addEventListener('load', async () => {
+            try {
+                // 请求五种关系的数据
+                const requests = [
+                    fetch('http://localhost:3000/api/type1'),
+                    fetch('http://localhost:3000/api/type2'),
+                    fetch('http://localhost:3000/api/type3'),
+                    fetch('http://localhost:3000/api/type4'),
+                    fetch('http://localhost:3000/api/type5')
+                ];
+
+                const responses = await Promise.all(requests);
+                const dataPromises = responses.map(response => response.json());
+                const dataArray = await Promise.all(dataPromises);
+
+                // 合并所有关系的数据
+                const allNodes = [];
+                const allEdges = [];
+
+                dataArray.forEach(data => {
+                    allNodes.push(...data.nodes);
+                    allEdges.push(...data.edges);
+                });
+
+                // 渲染图谱
+                renderGraph({ nodes: allNodes, edges: allEdges });
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        });
+
+        function renderGraph(data) {
+            // 去重节点，确保同一名称的节点只有一个
+            const uniqueNodes = {};
+
+            // 计算每个节点的度数（每个节点连接的边的数量）
+            const nodeDegrees = {};
+
+            data.edges.forEach(edge => {
+                nodeDegrees[edge.startId] = (nodeDegrees[edge.startId] || 0) + 1;
+                nodeDegrees[edge.endId] = (nodeDegrees[edge.endId] || 0) + 1;
+            });
+
+            // 获取度数最高的前八个节点
+            const sortedNodeIds = Object.keys(nodeDegrees).sort((a, b) => nodeDegrees[b] - nodeDegrees[a]);
+            const centerNodeIds = sortedNodeIds.slice(0, 6);  // 获取前六个节点
+
+            data.nodes.forEach(node => {
+                if (!uniqueNodes[node.name]) {
+                    uniqueNodes[node.name] = node;
+                }
+            });
+
+            const nodes = Object.values(uniqueNodes).map(node => {
+                const isCenter = centerNodeIds.includes(node.id.toString());
+                return {
+                    id: node.id,
+                    name: node.name,
+                    symbolSize: isCenter ? 40 : 20,
+                    itemStyle: {
+                        color: isCenter ? 'orange' : 'skyblue',
+                        borderColor: isCenter ? 'darkorange' : 'blue',
+                        borderWidth: isCenter ? 3 : 1
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 14,
+                        color: 'black'
+                    }
+                };
+            });
+
+            const edgesSet = new Set();
+            const edges = data.edges.filter(edge => {
+                const edgeKey = edge.startId < edge.endId
+                    ? `${edge.startId}-${edge.endId}`
+                    : `${edge.endId}-${edge.startId}`;
+
+                if (edgesSet.has(edgeKey)) {
+                    return false;
+                }
+                edgesSet.add(edgeKey);
+                return true;
+            }).map(edge => ({
+                source: edge.startId,
+                target: edge.endId
+            }));
+
+            const chartData = {
+                nodes: nodes,
+                links: edges
+            };
+
+            const container = document.getElementById('network');
+            const myChart = echarts.init(container);
+
+            const option = {
+                title: {
+                    text: '总图谱',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{b}'
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',  // 使用力导向布局
+                    symbolSize: 30,
+                    roam: true,
+                    label: {
+                        show: true,
+                        fontSize: 14,
+                        color: '#000'
+                    },
+                    edgeSymbol: ['none', 'none'],
+                    edgeLabel: {
+                        fontSize: 12
+                    },
+                    data: chartData.nodes,
+                    links: chartData.links,
+                    force: {
+                        repulsion: 150,
+                        edgeLength: [50, 150]
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        itemStyle: {
+                            color: 'red'
+                        }
+                    }
+                }]
+            };
+
+            myChart.setOption(option);
+
+            // 点击事件处理
+            myChart.on('click', function (params) {
+                if (params.dataType === 'node') {
+                    const nodeId = params.data.id;
+                    const nodeName = params.data.name;
+                    // 假设跳转到 detail.html 页面，并传递节点的 ID 和名称作为查询参数
+                    window.location.href = `detail.html?nodeId=${nodeId}&nodeName=${encodeURIComponent(nodeName)}`;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

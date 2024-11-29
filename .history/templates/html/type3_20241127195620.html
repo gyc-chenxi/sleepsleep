@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>风险评估关系</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="../js/echarts.min.js"></script> <!-- 引入 ECharts -->
+    <style>
+        /* 自定义样式 */
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>风险评估关系</h1>
+        <nav>
+            <ul>
+                <li><a href="index.html">总图谱</a></li>
+                <li><a href="type1.html">共现关系</a></li>
+                <li><a href="type2.html">关联关系</a></li>
+                <li><a href="type3.html">风险评估关系</a></li>
+                <li><a href="type4.html">诊断关系</a></li>
+                <li><a href="type5.html">建议适用关系</a></li>
+                <li><a href="search.html">根据名称查询</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="mynetwork">
+        <div id="network"></div>
+    </main>
+
+    <script>
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('http://localhost:3000/api/type3');
+                if (response.ok) {
+                    const data = await response.json();
+                    renderGraph(data);
+                } else {
+                    console.error('Error fetching data:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        });
+
+        function renderGraph(data) {
+            const uniqueNodes = {};
+            const nodeDegrees = {};
+
+            // 计算节点的连接度（连接的边的数量）
+            data.edges.forEach(edge => {
+                nodeDegrees[edge.startId] = (nodeDegrees[edge.startId] || 0) + 1;
+                nodeDegrees[edge.endId] = (nodeDegrees[edge.endId] || 0) + 1;
+            });
+
+            // 根据连接度排序，选出前6个中心节点
+            const sortedNodeIds = Object.keys(nodeDegrees).sort((a, b) => nodeDegrees[b] - nodeDegrees[a]);
+            const centerNodeIds = sortedNodeIds.slice(0, 6);
+
+            // 创建去重后的节点
+            data.nodes.forEach(node => {
+                if (!uniqueNodes[node.name]) {
+                    uniqueNodes[node.name] = node;
+                }
+            });
+
+            // 处理节点样式和大小
+            const nodes = Object.values(uniqueNodes).map(node => {
+                const isCenter = centerNodeIds.includes(node.id.toString());
+                return {
+                    id: node.id,
+                    name: node.name,
+                    symbolSize: isCenter ? 40 : 20,
+                    itemStyle: {
+                        color: isCenter ? 'orange' : 'skyblue',
+                        borderColor: isCenter ? 'darkorange' : 'blue',
+                        borderWidth: isCenter ? 3 : 1
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 14,
+                        color: 'black'
+                    }
+                };
+            });
+
+            // 处理边的去重和链接
+            const edgesSet = new Set();
+            const edges = data.edges.filter(edge => {
+                const edgeKey = edge.startId < edge.endId
+                    ? `${edge.startId}-${edge.endId}`
+                    : `${edge.endId}-${edge.startId}`;
+                if (edgesSet.has(edgeKey)) {
+                    return false;
+                }
+                edgesSet.add(edgeKey);
+                return true;
+            }).map(edge => ({
+                source: edge.startId,
+                target: edge.endId
+            }));
+
+            const chartData = {
+                nodes: nodes,
+                links: edges
+            };
+
+            const container = document.getElementById('network');
+            const myChart = echarts.init(container);
+
+            // 图表配置
+            const option = {
+                title: {
+                    text: '风险评估关系',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{b}'
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',  // 使用力导向布局
+                    symbolSize: 30,
+                    roam: true,
+                    label: {
+                        show: true,
+                        fontSize: 14,
+                        color: '#000'
+                    },
+                    edgeSymbol: ['none', 'none'],
+                    edgeLabel: {
+                        fontSize: 12
+                    },
+                    data: chartData.nodes,
+                    links: chartData.links,
+                    force: {
+                        repulsion: 150,
+                        edgeLength: [50, 150],
+                        gravity: 0.1 // 适度引力控制
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        itemStyle: {
+                            color: 'red'
+                        }
+                    }
+                }]
+            };
+
+            myChart.setOption(option);
+
+            // 动态调整字体显示与字体大小
+            function updateFontSize() {
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
+                const graphWidth = Math.max(...chartData.nodes.map(node => node.symbolSize)); // 计算图谱宽度
+                const graphHeight = chartData.nodes.length * 50;  // 估算图谱的高度
+
+                // 判断图谱是否过小，决定是否隐藏标签
+                const threshold = 0.5; // 可以调整这个阈值，控制字体隐藏的条件
+                const graphRatio = (containerWidth * containerHeight) / (graphWidth * graphHeight);
+                const shouldHideLabel = graphRatio < threshold; // 图谱小于一定比例时隐藏标签
+
+                // 动态调整字体大小，确保字体不会过大
+                const fontSize = Math.max(10, Math.min(20, (containerWidth + containerHeight) / (graphWidth + graphHeight)));
+
+                myChart.setOption({
+                    series: [{
+                        label: {
+                            show: !shouldHideLabel,  // 根据图谱尺寸决定是否显示标签
+                            fontSize: fontSize
+                        }
+                    }]
+                });
+            }
+
+            // 启用窗口resize事件来动态调整字体显示
+            window.addEventListener('resize', updateFontSize);
+            updateFontSize(); // 初始设置字体大小
+
+            // 点击事件处理
+            myChart.on('click', function (params) {
+                if (params.dataType === 'node') {
+                    const nodeId = params.data.id;
+                    const nodeName = params.data.name;
+                    // 假设跳转到 detail.html 页面，并传递节点的 ID 和名称作为查询参数
+                    window.location.href = `detail.html?nodeId=${nodeId}&nodeName=${encodeURIComponent(nodeName)}`;
+                    // 可以执行其他操作，如跳转到详细信息页面
+                }
+            });
+        }
+    </script>
+</body>
+</html>

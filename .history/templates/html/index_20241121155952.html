@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>总图谱</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="../js/echarts.min.js"></script>
+    <style>
+        /* 自定义样式 */
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+
+        /* 图例样式 */
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            margin: 0 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-color-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+        }
+
+        .center-node {
+            color: black;  /* 改为黑色字体 */
+            background-color: red;
+            border: 2px solid darkred;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .blue-node {
+            color: black;  /* 改为黑色字体 */
+            background-color: blue;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>总图谱</h1>
+        <nav>
+            <ul>
+                <li><a href="index.html">总图谱</a></li>
+                <li><a href="type1.html">共现关系</a></li>
+                <li><a href="type2.html">关联关系</a></li>
+                <li><a href="type3.html">风险评估关系</a></li>
+                <li><a href="type4.html">诊断关系</a></li>
+                <li><a href="type5.html">建议适用关系</a></li>
+                <li><a href="search.html">根据名称查询</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="mynetwork">
+        <div id="network"></div>
+    </main>
+
+    <!-- 图例部分 -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: red;"></div>
+            <span>风险评估关系</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: blue;"></div>
+            <span>共现关系</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: green;"></div>
+            <span>关联关系</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: orange;"></div>
+            <span>诊断关系</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: purple;"></div>
+            <span>建议适用关系</span>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', async () => {
+            try {
+                // 请求五种关系的数据
+                const requests = [
+                    fetch('http://localhost:3000/api/type1'),
+                    fetch('http://localhost:3000/api/type2'),
+                    fetch('http://localhost:3000/api/type3'),
+                    fetch('http://localhost:3000/api/type4'),
+                    fetch('http://localhost:3000/api/type5')
+                ];
+
+                const responses = await Promise.all(requests);
+                const dataPromises = responses.map(response => response.json());
+                const dataArray = await Promise.all(dataPromises);
+
+                // 合并所有关系的数据
+                const allNodes = [];
+                const allEdges = [];
+
+                dataArray.forEach(data => {
+                    allNodes.push(...data.nodes);
+                    allEdges.push(...data.edges);
+                });
+
+                // 渲染图谱
+                renderGraph({ nodes: allNodes, edges: allEdges });
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        });
+
+        function renderGraph(data) {
+            // 去重节点，确保同一名称的节点只有一个
+            const uniqueNodes = {};
+
+            // 计算每个节点的度数（每个节点连接的边的数量）
+            const nodeDegrees = {};
+
+            data.edges.forEach(edge => {
+                nodeDegrees[edge.startId] = (nodeDegrees[edge.startId] || 0) + 1;
+                nodeDegrees[edge.endId] = (nodeDegrees[edge.endId] || 0) + 1;
+            });
+
+            // 获取度数最高的前五个节点
+            const topNodes = Object.entries(nodeDegrees)
+                .sort((a, b) => b[1] - a[1])  // 按度数降序排序
+                .slice(0, 8)  // 取前五个
+                .map(entry => entry[0]);  // 只取节点的 ID
+
+            // 去重节点，确保同一名称的节点只有一个
+            data.nodes.forEach(node => {
+                if (!uniqueNodes[node.name]) {
+                    uniqueNodes[node.name] = node;
+                }
+            });
+
+            // 将节点信息格式化，并标记前五个中心节点为红色
+            const nodes = Object.values(uniqueNodes).map(node => {
+                const isCenter = topNodes.includes(node.id.toString());  // 判断是否是中心节点
+                return {
+                    id: node.id,
+                    name: node.name,
+                    itemStyle: {
+                        color: isCenter ? 'red' : 'blue'
+                    },
+                    label: {
+                        show: true,
+                        color: 'black',
+                        fontSize: isCenter ? 16 : 14,
+                        fontWeight: 'bold'
+                    },
+                    symbolSize: isCenter ? 30 : 20,
+                };
+            });
+
+            // 去除重复的边，确保每条边是唯一的
+            const edgesSet = new Set();
+            const edges = data.edges.filter(edge => {
+                const edgeKey = edge.startId < edge.endId
+                    ? `${edge.startId}-${edge.endId}`  // 保证每一条边只有一个唯一标识符
+                    : `${edge.endId}-${edge.startId}`;  // 反向的关系也认为是相同的
+
+                if (edgesSet.has(edgeKey)) {
+                    return false;  // 如果边已经存在，过滤掉
+                }
+                edgesSet.add(edgeKey);
+                return true;
+            }).map(edge => {
+                // 根据关系类型设置不同的线颜色
+                let lineColor = 'gray';  // 默认灰色
+                switch (edge.relationType) {
+                    case 'type1': lineColor = 'red'; break;  // 风险评估关系
+                    case 'type2': lineColor = 'blue'; break;  // 共现关系
+                    case 'type3': lineColor = 'green'; break;  // 关联关系
+                    case 'type4': lineColor = 'orange'; break;  // 诊断关系
+                    case 'type5': lineColor = 'purple'; break;  // 建议适用关系
+                    default: break;
+                }
+
+                return {
+                    source: edge.startId,
+                    target: edge.endId,
+                    lineStyle: {
+                        color: lineColor,
+                        width: 1
+                    }
+                };
+            });
+
+            // 创建 echarts 网络图的数据
+            const option = {
+                tooltip: {
+                    formatter: '{b}'
+                },
+                legend: {
+                    data: ['风险评估关系', '共现关系', '关联关系', '诊断关系', '建议适用关系'],
+                    orient: 'horizontal',
+                    left: 'center',
+                    bottom: '10%'
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',
+                    roam: true,
+                    symbolSize: 30,
+                    label: {
+                        show: true,
+                        position: 'right',
+                        fontSize: 12
+                    },
+                    force: {
+                        repulsion: 200,
+                        edgeLength: [50, 200],
+                        layoutAnimation: true
+                    },
+                    edgeSymbol: ['none', 'arrow'],
+                    edgeSymbolSize: [4, 10],
+                    data: nodes,
+                    links: edges
+                }]
+            };
+
+            // 初始化echarts实例并渲染图谱
+            const chart = echarts.init(document.getElementById('network'));
+            chart.setOption(option);
+        }
+    </script>
+</body>
+</html>

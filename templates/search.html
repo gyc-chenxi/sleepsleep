@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>疾病知识图谱</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+    <style>
+        /* 自定义样式 */
+        #network {
+            width: 100%;
+            height: 600px;  /* 设置固定高度 */
+            border: 1px solid lightgray;
+        }
+        /* 输入框和按钮的样式 */
+        .input-container {
+            margin-top: 20px;
+            margin-left: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .input-container input,
+        .input-container button {
+            margin-bottom: 10px;
+            padding: 8px;
+            font-size: 20px;  /* 默认字体大小 */
+            width: 250px; /* 输入框宽度 */
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        /* 放大输入框提示文本的字体 */
+        .input-container input::placeholder {
+            font-size: 22px;  /* 增大提示文本的字体 */
+            color: #888;      /* 设置提示文本颜色 */
+        }
+
+        .input-container button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        .input-container button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);  /* 按钮缩放效果 */
+        }
+
+        /* 增加输入框的聚焦效果 */
+        .input-container input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+<div class="navbar">
+    <a style="width:400px"><img src="{{url_for('static',filename='hostgator.png')}}" alt="Logo">龙智医疗</a>
+    <a href="{{url_for('html',filename='home.html')}}">首页</a>
+    <div class="dropdown">
+        <a href="{{url_for('html',filename='index.html')}}">知识图谱</a>
+        <div class="dropdown-content">
+            <a href="{{url_for('html',filename='index.html')}}">总图谱</a>
+            <a href="{{url_for('html',filename='type1.html')}}">共现关系</a>
+            <a href="{{url_for('html',filename='type2.html')}}">关联关系</a>
+            <a href="{{url_for('html',filename='type3.html')}}">风险评估关系</a>
+            <a href="{{url_for('html',filename='type4.html')}}">诊断关系</a>
+            <a href="{{url_for('html',filename='type5.html')}}">建议适用关系</a>
+            <a href="{{url_for('html',filename='search.html')}}">根据名称查询</a>
+        </div>
+    </div>
+    <a href="https://mbd.baidu.com/ma/s/gA2rpZEA">AI问诊</a>
+</div>
+
+<!-- 输入框和按钮 -->
+<div class="input-container">
+    <label for="diseaseInput">请输入您想查询的疾病名称：</label>
+    <input type="text" id="diseaseInput" name="input_value" placeholder="请输入疾病名称" />
+    <button id="submitBtn">点击提交查看知识图谱</button>
+</div>
+
+<!-- 图谱显示区域 -->
+<div id="network"></div>
+
+<script>
+    let chart = null;
+
+    // 页面加载时
+    window.addEventListener('load', function() {
+        // 检查是否已有疾病名称输入框的值，并加载图谱
+        const diseaseName = document.getElementById('diseaseInput').value.trim();
+        if (diseaseName) {
+            loadGraph(diseaseName);
+        }
+
+        // 监听按钮点击事件
+        document.getElementById('submitBtn').addEventListener('click', function(event) {
+            const diseaseName = document.getElementById('diseaseInput').value.trim();
+
+            // 检查疾病名称是否有效
+            if (!diseaseName) {
+                alert("请输入疾病名称！");
+                return;
+            }
+
+            // 加载图谱
+            loadGraph(diseaseName);
+        });
+    });
+
+    // 根据疾病名称加载图谱
+    async function loadGraph(diseaseName) {
+        console.log("加载的疾病名称：", diseaseName);  // 打印到控制台，查看传递的内容
+
+        try {
+            // 向后端请求与疾病相关的节点和关系
+            const response = await fetch(`http://localhost:3000/api/data?disease=${encodeURIComponent(diseaseName)}`);
+
+            if (!response.ok) {
+                console.error('网络请求失败:', response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+
+            // 检查返回的数据结构
+            if (!data.nodes || !data.edges) {
+                console.error('数据结构无效:', data);
+                alert("数据加载失败，检查返回的数据结构。");
+                return;
+            }
+
+            // 准备 ECharts 图数据
+            let nodes = [];
+            let links = [];
+            let diseaseNodeId = null;
+
+            // 查找并标记疾病名称节点
+            data.nodes.forEach(node => {
+                if (node.name === diseaseName) {
+                    diseaseNodeId = node.id;
+                }
+            });
+
+            if (!diseaseNodeId) {
+                console.error(`未找到疾病名称 "${diseaseName}" 的节点数据`);
+                return;
+            }
+
+            // 添加疾病中心节点
+            nodes.push({
+                id: diseaseNodeId,
+                name: diseaseName,
+                symbolSize: 40,
+                itemStyle: {
+                    color: 'yellow',
+                    borderColor: '#ffcc00',
+                    borderWidth: 2,
+                    shadowColor: 'rgba(0, 0, 0, 0.2)',
+                    shadowBlur: 10,
+                    shadowOffsetX: 5,
+                    shadowOffsetY: 5,
+                },
+                label: {
+                    show: true,
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    position: 'right',
+                    color: '#333',
+                }
+            });
+
+            // 添加其他相关节点
+            data.nodes.forEach((node) => {
+                if (node.name !== diseaseName) {
+                    nodes.push({
+                        id: node.id,
+                        name: node.name,
+                        symbolSize: 20,
+                        itemStyle: {
+                            color: 'lightblue',
+                            borderWidth: 2,
+                            borderColor: '#66ccff',
+                        },
+                        label: {
+                            show: true,
+                            fontSize: 14,
+                            color: '#333',
+                        }
+                    });
+
+                    // 创建连接
+                    links.push({
+                        source: diseaseNodeId,
+                        target: node.id,
+                        lineStyle: {
+                            color: '#848484',
+                            width: 2,
+                        }
+                    });
+                }
+            });
+
+            // 初始化 ECharts 图表
+            const container = document.getElementById('network');
+            const option = {
+                title: {
+                    text: `${diseaseName} - 知识图谱`,
+                    left: 'right',  // 标题居中对齐
+                    bottom: '0',       // 标题放置在顶部
+                    textStyle: {
+                        fontWeight: 'bold',
+                        fontSize: 24,
+                        color: '#2c3e50',
+                    }
+                },
+                tooltip: {
+                    formatter: '{b}', // 显示节点名称
+                    backgroundColor: '#fff',  // 提示框背景色
+                    borderColor: '#3498db',  // 提示框边框颜色
+                    borderWidth: 1,  // 提示框边框宽度
+                    padding: 10,
+                    textStyle: {
+                        color: '#2c3e50',
+                        fontSize: 16
+                    }
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force', // 使用力学布局
+                    data: nodes,
+                    links: links,
+                    roam: true, // 启用图表缩放和拖拽
+                    label: {
+                        show: true,
+                        position: 'right', // 标签显示在节点右侧
+                        fontSize: 14,
+                        color: '#2c3e50'
+                    },
+                    force: {
+                        repulsion: 1000,  // 排斥力增加，避免节点过于接近
+                        edgeLength: [80, 150], // 边的长度
+                        gravity: 0.1,  // 吸引力
+                    },
+                    emphasis: {
+                        focus: 'adjacency', // 高亮邻接节点
+                        itemStyle: {
+                            color: '#3498db', // 鼠标悬停节点的颜色
+                        },
+                        label: {
+                            color: '#3498db',
+                        }
+                    },
+                    itemStyle: {
+                        borderColor: '#2980b9',
+                        borderWidth: 2,
+                        shadowColor: 'rgba(0, 0, 0, 0.3)',
+                        shadowBlur: 10,
+                        opacity: 0.9,
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0, x2: 1, y2: 1,
+                            colorStops: [{
+                                offset: 0, color: '#1abc9c' // 起始颜色
+                            }, {
+                                offset: 1, color: '#16a085' // 结束颜色
+                            }]
+                        }
+                    },
+                    lineStyle: {
+                        color: '#ecf0f1', // 边的颜色
+                        width: 2,
+                        curveness: 0.2, // 设置边的弯曲度
+                        type: 'dashed',  // 设置虚线样式
+                    },
+                }],
+            };
+
+            // 使用 ECharts 渲染图谱
+            if (!chart) {
+                chart = echarts.init(container);
+            }
+            chart.setOption(option);
+        } catch (error) {
+            console.error('加载图谱时发生错误:', error);
+            alert("加载图谱时发生错误，请稍后再试。");
+        }
+    }
+</script>
+
+<footer style="background-color:grey; text-align: center; padding: 10px;">
+    <p>龙队 ©版权所有</p>
+</footer>
+</body>
+</html>

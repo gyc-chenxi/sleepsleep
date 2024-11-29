@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>龙智医疗问诊系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .word {
+            position: relative;
+            opacity: 0;
+            animation: slide 3s infinite;
+            color:purple;
+            font-size:58px;
+          }
+          @keyframes slide {
+            0% { opacity: 0; transform: translateY(-100%); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(100%); }
+          }
+        .navbar {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: #74b9ff; /* 纯天蓝色背景 */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+        }
+        .navbar {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        background-color: #74b9ff; /* 纯天蓝色背景 */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        padding: 1rem;
+        }
+        .navbar a {
+            color: #333;
+            text-decoration: none;
+            font-weight: 700;
+            transition: color 0.3s ease;
+            font-size:25px;
+        }
+        .navbar a:hover {
+            color: purple;
+        }
+        .navbar img{
+            width:50px;
+            height:40px;
+        }
+        /* 下拉菜单容器 */
+        .dropdown {
+            position: relative;
+        }
+
+        /* 触发下拉菜单的链接 */
+        .dropdown > a {
+            padding: 10px 20px;
+            color: #333;
+            text-decoration: none;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* 隐藏下拉菜单 */
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #74b9ff; /* 设置背景为天蓝色 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 200px;
+            z-index: 1;
+        }
+
+        /* 下拉菜单项 */
+        .dropdown-content a {
+            color: #333;
+            padding: 12px 16px;
+            display: block;
+            text-decoration: none;
+            font-size: 20px;  /* 可根据需要设置字体大小 */
+        }
+
+        /* 鼠标悬停时高亮显示菜单项 */
+        .dropdown-content a:hover {
+            background-color: #3498db;
+            color: white;
+        }
+
+        /* 当鼠标悬停时显示下拉菜单 */
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        .welcome-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 93vh;
+            padding: 0 1rem;
+            background-image: url("{{ url_for('static', filename='1.jpg') }}");
+            background-repeat:no-repeat;
+        }
+        .welcome-section h1 {
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+            color: #fff; /* 白色字体 */
+        }
+        .welcome-section p {
+            font-size: 1.2em;
+            margin-bottom: 2em;
+            color: #fff; /* 白色字体 */
+        }
+        .welcome-section button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: #fff;
+            background-color: #ff7777; /* 渐变色的一部分 */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            position:absolute;
+            top:768px;
+        }
+        .welcome-section button:hover {
+            background-color: #0056b3;
+        }
+        .welcome-section button:first-of-type{
+            left:450px;
+        }
+        .welcome-section button:last-of-type{
+            left:1150px;
+        }
+        .welcome-section h2 {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* 使用普通字体 */
+            color: white;
+            margin: 0 0 20px 0;
+            font-size: 3em;
+            text-align: center;
+        }
+        .welcome-section h3 {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* 使用普通字体 */
+            color: orange;
+            margin: 0 0 20px 0;
+            font-size: 3em;
+            text-align: center;
+        }
+        .content1 {
+            display: flex;
+            width: 100%;
+            justify-content: space-between; /* 左右内容区域间隔 */
+            background-color: transparent; /* 透明背景 */
+        }
+        .left, .right {
+            flex: 1; /* 左右两个区域平分空间 */
+            padding: 20px; /* 内边距 */
+            box-sizing: border-box; /* 盒模型 */
+            background-color: transparent;
+            margin: 0 10px; /* 左右边距 */
+            overflow-y: auto; /* 超出内容可滚动 */
+         }
+         .right img{
+            width:500px;
+            height:500px;
+         }
+        .features {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            padding: 40px;
+            gap: 20px;
+            height:99vh;
+            background-color: rgba(255, 255, 255, 0.9); /* 半透明背景 */
+        }
+
+        .feature {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: calc(33% - 10px);
+            transition: transform 0.3s ease;
+            transition:background-color 0.5s;
+        }
+        .feature:hover {
+            transform: translateY(-10px);
+            background-color:skyblue;
+        }
+        .feature img {
+            width: 400px;
+            height: 140px;
+            margin-bottom: 20px;
+        }
+        footer {
+            background-color: rgba(255, 255, 255, 0.9); /* 半透明背景 */
+            color: #333;
+            text-align: center;
+            padding: 20px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .welcome-section {
+            animation: fadeIn 2s ease-out;
+        }
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+            }
+            .navbar a {
+                margin: 10px 0;
+            }
+            .features {
+                justify-content: center;
+            }
+            .feature {
+                width: calc(50% - 10px);
+            }
+        }
+        @media (max-width: 480px) {
+            .welcome-section h1 {
+                font-size: 2em;
+            }
+            .welcome-section p {
+                font-size: 1em;
+            }
+            .feature {
+                width: calc(100% - 10px);
+            }
+        }
+
+    body {
+        content-align:center;
+        background: white;
+        min-height: 100vh;
+        color: #333;
+        font-family: 'Poppins', sans-serif;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+    }
+  .container {
+    max-width: 1170px;
+    margin: auto;
+    padding: 0 15px;
+  }
+  header {
+    text-align: center;
+    padding: 150px 0;
+  }
+  header h1 {
+    font-size: 3.5rem;
+    margin: 0;
+    color: #fff;
+    font-weight: 700;
+  }
+    .big{
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        background-image: url("{{ url_for('static', filename='b2.jpg') }}");
+        background-repeat:no-repeat;
+        background-attachment: fixed;
+        height:60vh;
+    }
+  .container {
+    display: flex;
+    justify-content: space-between;
+    max-width: 600px;
+    margin: 20px 20px;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    height:50vh;
+    opacity:0.9;
+  }
+  .container button:hover {
+            background-color: #0056b3;
+        }
+        .container button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: #fff;
+            background-color: #ff7777;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            height:50px;
+            transition: background-color 0.3s ease;
+            position:absolute;
+            right:10px;
+        }
+        .container button:first-of-type{
+            top:3550px;
+        }
+
+  #left-panel {
+    width: 75%;
+    padding: 20px;
+    box-sizing: 300px;
+  }
+  #right-panel {
+    width: 25%;
+    padding: 20px;
+    box-sizing: 300px;
+  }
+  input[type="text"], textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  input[type="text"]:focus, textarea:focus {
+    outline: none;
+    border-color: #007bff;
+  }
+  .metrics {
+    display: flex;
+    justify-content: space-between;
+  }
+  .metrics div {
+    width: calc(33% - 10px);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  th {
+    background-color: #007bff;
+    color: #fff;
+  }
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+
+  input[type="submit"] {
+    background-color: #74b9ff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  input[type="submit"]:hover {
+    background-color: #5889c0;
+  }
+  @media (max-width: 768px) {
+    header h1 {
+      font-size: 2.5rem;
+    }
+    nav a {
+      padding: 10px 15px;
+    }
+    .container {
+      flex-direction: column;
+    }
+    #left-panel, #right-panel {
+      width: 100%;
+    }
+    .metrics {
+      flex-direction: column;
+    }
+    .metrics div {
+      width: 100%;
+    }
+  }
+    .features {
+    background-image: linear-gradient(to bottom,white,skyblue); /* 渐变背景色 */
+    font-family: 'Noto Sans SC', sans-serif;
+    }
+        .m1 {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            padding: 40px;
+            gap: 20px;
+            background-image: url("{{ url_for('static', filename='b.jpg') }}");
+            background-repeat:no-repeat;
+            background-attachment: fixed;
+            height:60vh;
+        }
+        .text-flip {
+            opacity: 0;
+            transform: rotateX(-90deg);
+            transition: transform 0.5s, opacity 0.5s;
+            will-change: transform, opacity; /* 优化性能 */
+        }
+        .text-flip.visible {
+            opacity: 1;
+            transform: rotateX(0deg);
+        }
+        .blue-box {
+            width: 50%;
+            height: 100%;
+            margin:50px,auto;
+            background-color: rgba(0, 0, 255, 0.6);
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align:center;
+        }
+        .blue-box h1{
+            color:white;
+            font-size:50px;
+        }
+        .blue-box p{
+            color:white;
+            font-size:25px;
+        }
+        .w{
+            background-image:linear-gradient(to bottom,#ffffff 30%,#87ceeb);
+            height:30vh;
+            padding-left:200px;
+            padding-right:200px;
+        }
+        .text-flip p{
+            font-size:20px;
+            text-align:center;
+        }
+        .text-flip h1{
+            font-size:30px;
+            text-align:center;
+            color:blue;
+        }
+        .y4{
+            height:42vh;
+            background-color:lightskyblue;
+            opacity:0.4;
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+        }
+        .y4l {
+            height: 42vh;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5em;
+            text-align: center;
+            flex: 1;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: transparent;
+            margin: 0 10px;
+            overflow-y: auto;
+          }
+          .y4r {
+            height: 42vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size:30px;
+            text-align: center;
+            flex: 1;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: transparent;
+            margin: 0 10px;
+            overflow-y: auto;
+          }
+        .y4l p{
+            color:#191970;
+            font-weight:700;
+        }
+        .y4r p{
+            color:#191970;
+            font-weight:700;
+        }
+        .slide-in1 {
+            opacity: 0;
+            transform: translateY(-100%);
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+          }
+        .slide-in2 {
+            opacity: 0;
+            transform: translateY(+100%);
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+          }
+
+          .slide-in1.active {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        .slide-in2.active {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        .new{
+            text-align:center;
+        }
+        .pn1{
+            font-size:25px;
+            color:purple;
+        }
+        .pn2{
+            font-size:40px;
+            color:black;
+        }
+    </style>
+
+</head>
+<body>
+
+<div class="navbar">
+    <a style="width:400px"><img src="{{url_for('static',filename='hostgator.png')}}" alt="a">龙智医疗</a>
+    <a href="{{url_for('html',filename='home.html')}}" style="color:purple">首页</a>
+    <div class="dropdown">
+        <a href="{{url_for('html',filename='index.html')}}">知识图谱</a>
+            <div class="dropdown-content">
+                    <a href="{{url_for('html',filename='index.html')}}">总图谱</a>
+                    <a href="{{url_for('html',filename='type1.html')}}">共现关系</a>
+                    <a href="{{url_for('html',filename='type2.html')}}">关联关系</a>
+                    <a href="{{url_for('html',filename='type3.html')}}">风险评估关系</a>
+                    <a href="{{url_for('html',filename='type4.html')}}">诊断关系</a>
+                    <a href="{{url_for('html',filename='type5.html')}}">建议适用关系</a>
+                    <a href="{{url_for('html',filename='search.html')}}">根据名称查询</a>
+                </div>
+         </div>
+    <a href="https://mbd.baidu.com/ma/s/gA2rpZEA">AI问诊</a>
+</div>
+
+<div class="welcome-section" id="home">
+    <h1>欢迎来到龙智医疗问诊系统！</h1>
+    <div class="content1">
+        <div class="left">
+            <h2>这是我们为</h2>
+            <div id="word" class="word">男士</div>
+            <h2>量身定制的医疗问诊系统！</h2>
+            <br>
+            <p>&check; 分析您的病症</p>
+            <p>&check; 关照您的健康</p>
+            <p>&check; 为您提供建议</p>
+            <p>&check; 为您的莅临做好准备</p>
+        </div>
+        <div class="right">
+
+        </div>
+    </div>
+    <p>现在您需要？</p>
+    <button onclick="scrollToFeatures()">了解我们</button>
+    <button onclick="scrollToContainer()">开始诊断</button>
+</div>
+<div class="new" id="new">
+    <p class="pn1">我们承诺</p>
+    <p class="pn2">“追求卓越，永不止步”</p>
+</div>
+<div class="features" id="features">
+    <div class="feature">
+        <img src="{{url_for('static',filename='p1.jpg')}}" alt="Feature 1">
+        <h2>创新设计</h2>
+        <p>我们的设计理念始终以患者为中心，致力于打造创新且高质量的医疗问诊服务，我们不断追求技术创新，利用最新的医疗信息技术，如人工智能、大数据分析和移动健康应用，来提升诊断的准确性和效率。</p >
+    </div>
+    <div class="feature">
+        <img src="{{url_for('static',filename='p2.jpg')}}" alt="Feature 2">
+        <h2>先进技术</h2>
+        <p>我们致力于利用最新的技术，以提供无与伦比的精确诊断，我们的系统能够处理复杂的医疗信息，提供快速而准确的诊断结果，帮助医生制定更有效的治疗计划。我们的目标是通过技术创新，提高诊断的准确性和效率，最终改善患者的治疗效果和生活质量。</p >
+    </div>
+    <div class="feature">
+        <img src="{{url_for('static',filename='p3.jpg')}}" alt="Feature 3">
+        <h2>卓越服务</h2>
+        <p>我们队伍随时准备为您提供全方位的帮助和支持。我们深知在医疗问诊服务中，及时和有效的沟通对于患者满意度至关重要，我们相信，通过不懈的努力和持续的改进，我们能够为患者提供超出期望的服务体验，让他们在面对健康挑战时感到更加自信和支持。</p >
+    </div>
+
+</div>
+<div class="m1">
+<div class="blue-box">
+    <h1>我们医疗问询系统有何优势？</h1>
+    <p>&check; ECharts 可视化</p>
+    <p>&check; 力导向布局</p>
+    <p>&check; 动态字体调整</p>
+    <p>&check; 个性化节点样式</p>
+    <p>&check; 交互性增强</p>
+    <p>&check; 响应式设计</p>
+</div>
+</div>
+<div class="w">
+<div class="text-flip">
+        <h1>具体介绍</h1>
+        <p>该项目通过支持多种关系类型、优化数据库查询、精确管理数据、增强前端交互、灵活获取数据以及强化错误处理等措施，提升了知识图谱的功能性和用户体验。同时，利用ECharts可视化、力导向布局、动态字体调整、个性化节点样式和响应式设计等技术，进一步增强了图谱的美观性、清晰度和适应性，为用户提供了一个既强大又易用的交互式知识图谱平台。</p>
+</div>
+</div>
+<div class="y4">
+<div class="y4l">
+    <div class="slide-in1" id="slideInDiv">
+    <p>邂逅我们顶尖的</p>
+    <p>诊断艺术！</p>
+    </div>
+</div>
+<div class="y4r">
+    <div class="slide-in2" id="slideInDiv2">
+    <p>大量数据集训练！</p>
+    <img src="{{url_for('static',filename='数据.png')}}" alt="data">
+    </div>
+</div>
+</div>
+<div class="big">
+<div class="container" id="container">
+  <div id="left-panel">
+    <h2>患者信息输入：</h2>
+    <form id="symptomForm" action="/submit" method="post">
+      <input type="text" id="currentHistory" placeholder="性别">
+      <input type="text" id="pastHistory" placeholder="年龄">
+      <input type="text" id="allergyHistory" placeholder="手术史">
+      <input type="text" id="personalHistory" placeholder="不良嗜好">
+      <input type="text" id="familyHistory" placeholder="长期居留地">
+      <input type="text" name="input_value" placeholder="症状">
+      <input type="submit" value="提交">
+    </form>
+  </div>
+    <button onclick="scrollToTop()">返回顶部</button>
+</div>
+</div>
+<footer style="background-color:grey;">
+    <p>龙队 ©版权所有</p >
+</footer>
+
+<script>
+    function scrollToFeatures() {
+        document.getElementById('new').scrollIntoView({behavior: 'smooth'});
+    }
+    function scrollToContainer() {
+        document.getElementById('container').scrollIntoView({behavior: 'smooth'});
+    }
+    function scrollToTop() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    const words = ["女士", "成人", "父母", "老人", "您", "男士"];
+
+    let currentIndex = 0;
+
+  setInterval(() => {
+    const wordElement = document.getElementById('word');
+    wordElement.textContent = words[currentIndex];
+    currentIndex = (currentIndex + 1) % words.length;
+    wordElement.style.animation = 'none';
+    wordElement.offsetHeight; /* trigger reflow */
+    wordElement.style.animation = null;
+  }, 1500);
+    window.addEventListener('scroll', () => {
+            const texts = document.querySelectorAll('.text-flip');
+            texts.forEach(text => {
+                const rect = text.getBoundingClientRect();
+                const threshold = 0.75; // 可视区域的一半作为触发点
+                if (rect.top < window.innerHeight * threshold && rect.bottom > 0) {
+                    text.classList.add('visible');
+                } else {
+                    text.classList.remove('visible');
+                }
+            });
+        });
+
+      const slideInDiv = document.getElementById('slideInDiv');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        slideInDiv.classList.add('active');
+      } else {
+        slideInDiv.classList.remove('active');
+      }
+    });
+  }, {
+  });
+
+  observer.observe(slideInDiv);
+
+    const slideInDiv2 = document.getElementById('slideInDiv2');
+  const observer2 = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        slideInDiv2.classList.add('active');
+      } else {
+        slideInDiv2.classList.remove('active');
+      }
+    });
+  }, {
+  });
+
+  observer2.observe(slideInDiv);
+</script>
+
+</body>
+</html>

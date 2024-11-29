@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>总图谱</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        /* 自定义样式 */
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+        .center-node {
+            color: black;  /* 改为黑色字体 */
+            background-color: red;
+            border: 2px solid darkred;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .blue-node {
+            color: black;  /* 改为黑色字体 */
+            background-color: blue;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>总图谱</h1>
+        <nav>
+            <ul>
+                <li><a href="index.html">总图谱</a></li>
+                <li><a href="type1.html">共现关系</a></li>
+                <li><a href="type2.html">关联关系</a></li>
+                <li><a href="type3.html">风险评估关系</a></li>
+                <li><a href="type4.html">诊断关系</a></li>
+                <li><a href="type5.html">建议适用关系</a></li>
+                <li><a href="search.html">根据名称查询</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="mynetwork">
+        <div id="network"></div>
+    </main>
+
+    <script>
+        window.addEventListener('load', async () => {
+            try {
+                // 请求五种关系的数据
+                const requests = [
+                    fetch('http://localhost:3000/api/type1'),
+                    fetch('http://localhost:3000/api/type2'),
+                    fetch('http://localhost:3000/api/type3'),
+                    fetch('http://localhost:3000/api/type4'),
+                    fetch('http://localhost:3000/api/type5')
+                ];
+
+                const responses = await Promise.all(requests);
+                const dataPromises = responses.map(response => response.json());
+                const dataArray = await Promise.all(dataPromises);
+
+                // 合并所有关系的数据
+                const allNodes = [];
+                const allEdges = [];
+
+                dataArray.forEach(data => {
+                    allNodes.push(...data.nodes);
+                    allEdges.push(...data.edges);
+                });
+
+                // 渲染图谱
+                renderGraph({ nodes: allNodes, edges: allEdges });
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        });
+
+        function renderGraph(data) {
+            // 去重节点，确保同一名称的节点只有一个
+            const uniqueNodes = {};
+
+            // 计算每个节点的度数（每个节点连接的边的数量）
+            const nodeDegrees = {};
+
+            data.edges.forEach(edge => {
+                nodeDegrees[edge.startId] = (nodeDegrees[edge.startId] || 0) + 1;
+                nodeDegrees[edge.endId] = (nodeDegrees[edge.endId] || 0) + 1;
+            });
+
+            // 获取度数最高的前五个节点
+            const topNodes = Object.entries(nodeDegrees)
+                .sort((a, b) => b[1] - a[1])  // 按度数降序排序
+                .slice(0, 8)  // 取前五个
+                .map(entry => entry[0]);  // 只取节点的 ID
+
+            // 去重节点，确保同一名称的节点只有一个
+            data.nodes.forEach(node => {
+                if (!uniqueNodes[node.name]) {
+                    uniqueNodes[node.name] = node;
+                }
+            });
+
+            // 将节点信息格式化，并标记前五个中心节点为红色
+            const nodes = Object.values(uniqueNodes).map(node => {
+                const isCenter = topNodes.includes(node.id.toString());  // 判断是否是中心节点
+                return {
+                    id: node.id,
+                    label: node.name,
+                    color: isCenter ? 'red' : 'blue',
+                    size: isCenter ? 30 : 20,
+                    font: { color: 'black' },  // 节点字体颜色改为黑色
+                    shape: 'dot',  // 设置节点形状为圆形
+                    borderWidth: isCenter ? 3 : 1
+                };
+            });
+
+            // 去除重复的边，确保每条边是唯一的
+            const edgesSet = new Set();
+            const edges = data.edges.filter(edge => {
+                const edgeKey = edge.startId < edge.endId
+                    ? `${edge.startId}-${edge.endId}`  // 保证每一条边只有一个唯一标识符
+                    : `${edge.endId}-${edge.startId}`;  // 反向的关系也认为是相同的
+
+                if (edgesSet.has(edgeKey)) {
+                    return false;  // 如果边已经存在，过滤掉
+                }
+                edgesSet.add(edgeKey);
+                return true;
+            }).map(edge => ({
+                from: edge.startId,
+                to: edge.endId
+            }));
+
+            // 创建 vis.js 网络数据
+            const networkData = {
+                nodes: new vis.DataSet(nodes),
+                edges: new vis.DataSet(edges)
+            };
+
+            // 渲染网络图
+            const container = document.getElementById('network');
+            new vis.Network(container, networkData, {
+                nodes: {
+                    shape: 'dot',
+                    size: 15
+                },
+                edges: {
+                    color: 'gray',
+                    width: 1
+                },
+                physics: {
+                    enabled: true,  // 开启物理引擎，让节点自动布局
+                    solver: 'forceAtlas2Based'
+                }
+            });
+        }
+    </script>
+</body>
+</html>

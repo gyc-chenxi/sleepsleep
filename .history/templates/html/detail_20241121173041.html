@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>疾病知识图谱</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- 引入 ECharts -->
+    <script src="../js/echarts.min.js"></script>
+    <style>
+        /* 自定义样式 */
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+            background-color: #f0f0f0;
+        }
+
+        .echart-node {
+            transition: all 0.3s ease-in-out;
+        }
+
+        .echart-node:hover {
+            transform: scale(1.2);  /* 鼠标悬停时放大 */
+            z-index: 10;  /* 确保悬停的节点位于最前面 */
+        }
+
+        .echart-link {
+            transition: all 0.3s ease-in-out;
+        }
+
+        .echart-link:hover {
+            stroke-width: 4;
+            stroke: #ff6600; /* 鼠标悬停时改变连线颜色 */
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>疾病知识图谱 - <span id="symptomName"></span></h1>
+    <nav>
+        <ul>
+            <li><a href="index.html">总图谱</a></li>
+            <li><a href="type1.html">共现关系</a></li>
+            <li><a href="type2.html">关联关系</a></li>
+            <li><a href="type3.html">风险评估关系</a></li>
+            <li><a href="type4.html">诊断关系</a></li>
+            <li><a href="type5.html">建议适用关系</a></li>
+            <li><a href="search.html">根据名称查询</a></li>
+        </ul>
+    </nav>
+</header>
+
+<!-- 图谱显示区域 -->
+<div id="network"></div>
+
+<script>
+    let chart = null;
+
+    async function loadGraph() {
+        // 获取 URL 参数中的 nodeName
+        const urlParams = new URLSearchParams(window.location.search);
+        const nodeName = urlParams.get('nodeName');
+
+        // 如果没有提供症状名称，提示用户
+        if (!nodeName) {
+            alert("没有提供症状名称！");
+            return;
+        }
+
+        // 显示症状名称
+        document.getElementById('symptomName').innerText = nodeName;
+
+        try {
+            // 向后端请求根据节点名称的数据
+            const response = await fetch(`http://localhost:3000/api/data?disease=${encodeURIComponent(nodeName)}`);
+
+            if (!response.ok) {
+                console.error('Network response was not ok:', response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+
+            // 检查返回的数据结构
+            if (!data.nodes || !data.edges) {
+                console.error('Data structure is invalid:', data);
+                return;
+            }
+
+            // 准备 ECharts 图数据
+            let nodes = [];
+            let links = [];
+            let symptomNodeId = 1; // 固定症状节点ID
+            let centerNode = null; // 保存中心节点
+
+            // 添加症状节点（黄色中心节点）
+            nodes.push({
+                id: symptomNodeId,
+                name: nodeName,
+                symbolSize: 40,
+                x: 0, // 固定位置，确保在图的中央
+                y: 0, // 固定位置，确保在图的中央
+                itemStyle: {
+                    color: 'yellow',
+                    borderColor: '#ffcc00',  // 边框颜色
+                    borderWidth: 2,  // 边框宽度
+                    shadowColor: 'rgba(0, 0, 0, 0.2)',  // 阴影颜色
+                    shadowBlur: 10,  // 阴影模糊度
+                    shadowOffsetX: 5,  // 阴影横向偏移
+                    shadowOffsetY: 5,  // 阴影纵向偏移
+                },
+                label: {
+                    show: true,
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                }
+            });
+
+            // 确保蓝色中心节点不被删除
+            data.nodes.forEach((node) => {
+                if (node.name !== nodeName) {
+                    // 保留原蓝色节点
+                    if (!centerNode) {
+                        centerNode = node;
+                    }
+
+                    // 添加其他相关节点
+                    nodes.push({
+                        id: node.id,
+                        name: node.name,
+                        symbolSize: 20,
+                        itemStyle: {
+                            color: 'lightblue',
+                            borderWidth: 2,
+                            borderColor: '#66ccff',
+                        },
+                        label: {
+                            show: true,
+                            fontSize: 14,
+                            color: '#333',
+                        }
+                    });
+
+                    links.push({
+                        source: symptomNodeId,
+                        target: node.id,
+                        lineStyle: {
+                            color: '#848484',
+                            width: 2
+                        }
+                    });
+                }
+            });
+
+            // 如果 centerNode 存在，添加为蓝色中心节点
+            if (centerNode) {
+                nodes.push({
+                    id: centerNode.id,
+                    name: centerNode.name,
+                    symbolSize: 30,
+                    itemStyle: {
+                        color: 'lightblue',
+                        borderWidth: 2,
+                        borderColor: '#66ccff',
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 16,
+                        color: '#333',
+                    }
+                });
+            }
+
+            // 初始化 ECharts 图表
+            const container = document.getElementById('network');
+            const option = {
+                tooltip: {
+                    formatter: '{b}', // 显示节点名称
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force', // 使用力学布局
+                    data: nodes,
+                    links: links,
+                    roam: true,
+                    label: {
+                        show: true,
+                        position: 'right',
+                    },
+                    force: {
+                        repulsion: 500,
+                        edgeLength: [50, 150],
+                        gravity: 0.1, // 控制节点之间的引力，数值越大节点越靠近
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        itemStyle: {
+                            color: '#ffcc00',
+                        },
+                        label: {
+                            color: '#ffcc00',
+                        }
+                    },
+                    itemStyle: {
+                        opacity: 0.8,
+                    },
+                    lineStyle: {
+                        color: 'rgba(0, 0, 0, 0.5)',
+                        width: 2,
+                        curveness: 0.3,
+                    },
+                }],
+            };
+
+            // 使用 ECharts 渲染图谱
+            if (!chart) {
+                chart = echarts.init(container);
+            }
+
+            chart.setOption(option);
+
+        } catch (error) {
+            console.error('Error fetching relations:', error);
+        }
+    }
+
+
+
+    // 页面加载时加载图谱数据
+    window.addEventListener('load', loadGraph);
+</script>
+</body>
+</html>

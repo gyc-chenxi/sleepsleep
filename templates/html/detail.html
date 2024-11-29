@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>疾病知识图谱</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="../js/echarts.min.js"></script>
+    <style>
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>疾病知识图谱 - <span id="symptomName"></span></h1>
+    <nav>
+        <ul>
+            <li><a href="index.html">总图谱</a></li>
+            <li><a href="type1.html">共现关系</a></li>
+            <li><a href="type2.html">关联关系</a></li>
+            <li><a href="type3.html">风险评估关系</a></li>
+            <li><a href="type4.html">诊断关系</a></li>
+            <li><a href="type5.html">建议适用关系</a></li>
+            <li><a href="search.html">根据名称查询</a></li>
+        </ul>
+    </nav>
+</header>
+
+<div id="network"></div>
+
+<script>
+    let chart = null;
+
+    async function loadGraph() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const nodeName = urlParams.get('nodeName');
+
+        if (!nodeName) {
+            alert("没有提供症状名称！");
+            return;
+        }
+
+        document.getElementById('symptomName').innerText = nodeName;
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/data?disease=${encodeURIComponent(nodeName)}`);
+
+            if (!response.ok) {
+                console.error('Network response was not ok:', response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+
+            if (!data.nodes || !data.edges) {
+                console.error('Data structure is invalid:', data);
+                return;
+            }
+
+            let nodes = [];
+            let links = [];
+            let symptomNodeId = null;
+
+            // 查找中心节点的 ID
+            data.nodes.forEach(node => {
+                if (node.name === nodeName) {
+                    symptomNodeId = node.id;
+                }
+            });
+
+            // 如果没有找到中心节点，手动创建
+            if (!symptomNodeId) {
+                symptomNodeId = `center-${Date.now()}`;
+                nodes.push({
+                    id: symptomNodeId,
+                    name: nodeName,
+                    symbolSize: 40,
+                    itemStyle: {
+                        color: 'yellow',
+                        borderColor: '#ffcc00',
+                        borderWidth: 2,
+                        shadowColor: 'rgba(0, 0, 0, 0.2)',
+                        shadowBlur: 10,
+                        shadowOffsetX: 5,
+                        shadowOffsetY: 5,
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 18,
+                        fontWeight: 'bold',
+                    }
+                });
+            }
+
+            // 添加所有节点
+            data.nodes.forEach(node => {
+                nodes.push({
+                    id: node.id,
+                    name: node.name,
+                    symbolSize: 20,
+                    itemStyle: {
+                        color: 'lightblue',
+                        borderWidth: 2,
+                        borderColor: '#66ccff',
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 14,
+                        color: '#333',
+                    }
+                });
+
+                // 添加连线
+                data.edges.forEach(edge => {
+                    links.push({
+                        source: edge.source,
+                        target: edge.target,
+                        lineStyle: {
+                            color: '#848484',
+                            width: 2,
+                        }
+                    });
+                });
+            });
+
+            // 检查中心节点是否需要补充关系
+            data.nodes.forEach(node => {
+                if (node.name !== nodeName) {
+                    links.push({
+                        source: symptomNodeId,
+                        target: node.id,
+                        lineStyle: {
+                            color: '#ff6600',
+                            width: 2,
+                        }
+                    });
+                }
+            });
+
+            // 初始化 ECharts
+            if (!chart) {
+                chart = echarts.init(document.getElementById('network'));
+            }
+
+            chart.setOption({
+                tooltip: {
+                    formatter: params => {
+                        if (params.dataType === 'node') {
+                            return `节点: ${params.data.name}`;
+                        } else if (params.dataType === 'edge') {
+                            return `连接: ${params.data.source} → ${params.data.target}`;
+                        }
+                    }
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',
+                    roam: true,
+                    label: {
+                        show: true,
+                        position: 'top'
+                    },
+                    force: {
+                        repulsion: 300,
+                        edgeLength: 100,
+                    },
+                    data: nodes,
+                    links: links,
+                }]
+            });
+
+        } catch (error) {
+            console.error('Error fetching or displaying data:', error);
+        }
+    }
+
+    loadGraph();
+</script>
+</body>
+</html>

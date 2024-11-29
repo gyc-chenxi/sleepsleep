@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>疾病知识图谱</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- 引入 ECharts -->
+    <script src="../js/echarts.min.js"></script>
+</head>
+<body>
+<header>
+    <h1>疾病知识图谱</h1>
+    <nav>
+        <ul>
+            <li><a href="index.html">总图谱</a></li>
+            <li><a href="type1.html">共现关系</a></li>
+            <li><a href="type2.html">关联关系</a></li>
+            <li><a href="type3.html">风险评估关系</a></li>
+            <li><a href="type4.html">诊断关系</a></li>
+            <li><a href="type5.html">建议适用关系</a></li>
+            <li><a href="search.html">根据名称查询</a></li>
+        </ul>
+    </nav>
+</header>
+
+<!-- 输入框和按钮 -->
+<div class="input-container">
+    <!-- 使用Flask传递的预测疾病结果 -->
+    <input type="text" id="diseaseInput" placeholder="请输入疾病名称" value="{{ predicted_disease }}" readonly />
+    <button onclick="loadGraph()">加载知识图谱</button>
+</div>
+
+<!-- 图谱显示区域 -->
+<div id="network" style="height: 600px;"></div>
+
+<script>
+    let chart = null;
+
+    async function loadGraph() {
+        const diseaseName = document.getElementById('diseaseInput').value.trim();
+
+        if (!diseaseName) {
+            alert("请输入一个疾病名称！");
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/data?disease=${encodeURIComponent(diseaseName)}`);
+
+            if (!response.ok) {
+                console.error('Network response was not ok:', response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+
+            // 检查返回的数据结构
+            if (!data.nodes || !data.edges) {
+                console.error('Data structure is invalid:', data);
+                return;
+            }
+
+            // 准备 ECharts 图数据
+            let nodes = [];
+            let links = [];
+            let diseaseNodeId = 1; // 固定疾病节点ID
+
+            // 添加疾病节点
+            nodes.push({
+                id: diseaseNodeId,
+                name: diseaseName,
+                symbolSize: 30,
+                itemStyle: { color: 'red' },
+            });
+
+            // 添加其他相关节点
+            data.nodes.forEach((node, index) => {
+                nodes.push({
+                    id: node.id,
+                    name: node.name,
+                    symbolSize: 20,
+                    itemStyle: { color: 'lightblue' },
+                });
+                links.push({
+                    source: diseaseNodeId,
+                    target: node.id,
+                    lineStyle: { color: '#848484', width: 2 }
+                });
+            });
+
+            // 初始化图表
+            const container = document.getElementById('network');
+            const option = {
+                tooltip: {
+                    formatter: '{b}', // 显示节点名称
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force', // 使用力学布局
+                    data: nodes,
+                    links: links,
+                    roam: true,
+                    label: {
+                        show: true,
+                        position: 'right',
+                    },
+                    force: {
+                        repulsion: 500,
+                        edgeLength: [50, 150],
+                    },
+                }],
+            };
+
+            // 使用 ECharts 渲染图谱
+            if (!chart) {
+                chart = echarts.init(container);
+            }
+
+            chart.setOption(option);
+
+        } catch (error) {
+            console.error('Error loading graph data:', error);
+        }
+    }
+
+    window.onload = function() {
+        loadGraph();
+    }
+</script>
+
+</body>
+</html>
